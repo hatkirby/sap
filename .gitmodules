@@ -1,0 +1,3 @@
+[submodule "vendor/rawr-ebooks"]
+	path = vendor/rawr-ebooks
+	url = https://github.com/hatkirby/rawr-ebooks
