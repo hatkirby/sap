@@ -18,6 +18,13 @@ extern "C" {
 #include <thread>
 #include <chrono>
 
+/* - random frames from Spongebob (using ffmpeg)
+ * with strange text overlaid, possibly rawr'd from
+ * spongebob transcripts combined with drug trip
+ * experiences? either that or something with verb
+ * frames
+ */
+
 template <class Container>
 Container split(std::string input, std::string delimiter)
 {
@@ -442,25 +449,16 @@ int main(int argc, char** argv)
         
         std::cout << "Generated image." << std::endl << "Tweeting..." << std::endl;
         
-        long media_id;
-        twitter::response resp = client.uploadMedia("image/jpeg", (const char*) outputimg.data(), outputimg.length(), media_id);
-        if (resp != twitter::response::ok)
+        try
         {
-          std::cout << "Twitter error while uploading image: " << resp << std::endl;
-          
-          break;
-        }
+          long media_id = client.uploadMedia("image/jpeg", (const char*) outputimg.data(), outputimg.length());
+          client.updateStatus("", {media_id});
     
-        twitter::tweet tw;
-        resp = client.updateStatus("", tw, twitter::tweet(), {media_id});
-        if (resp != twitter::response::ok)
+          std::cout << "Done!" << std::endl << "Waiting..." << std::endl << std::endl;
+        } catch (const twitter::twitter_error& error)
         {
-          std::cout << "Twitter error while tweeting: " << resp << std::endl;
-          
-          break;
+          std::cout << "Twitter error: " << error.what() << std::endl;
         }
-    
-        std::cout << "Done!" << std::endl << "Waiting..." << std::endl << std::endl;
       
         break;
       }
