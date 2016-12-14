@@ -106,28 +106,8 @@ int minHeightRequired(std::vector<std::string> words, Magick::Image& textimage)
   return result - 5;
 }
 
-void layoutText(Magick::Image& textimage, Magick::Image& shadowimage, int width, int height, std::string text)
+void layoutText(Magick::Image& textimage, Magick::Image& shadowimage, int width, int height, std::string text, const std::vector<std::string>& fonts)
 {
-  DIR* fontdir;
-  struct dirent* ent;
-  if ((fontdir = opendir("fonts")) == nullptr)
-  {
-    std::cout << "Couldn't find fonts." << std::endl;
-    return;
-  }
-
-  std::vector<std::string> fonts;
-  while ((ent = readdir(fontdir)) != nullptr)
-  {
-    std::string dname(ent->d_name);
-    if ((dname.find(".otf") != std::string::npos) || (dname.find(".ttf") != std::string::npos))
-    {
-      fonts.push_back(dname);
-    }
-  }
-
-  closedir(fontdir);
-
   textimage.fillColor(Magick::Color(MaxRGB, MaxRGB, MaxRGB, MaxRGB * 0.0));
   shadowimage.fillColor(Magick::Color(0, 0, 0, 0));
   shadowimage.strokeColor("black");
@@ -145,8 +125,8 @@ void layoutText(Magick::Image& textimage, Magick::Image& shadowimage, int width,
     if (font.empty() || (rand() % 10 == 0))
     {
       font = fonts[rand() % fonts.size()];
-      textimage.font("fonts/" + font);
-      shadowimage.font("fonts/" + font);
+      textimage.font(font);
+      shadowimage.font(font);
     }
     
     int size = rand() % (maxSize - minSize + 1) + minSize;
@@ -273,8 +253,15 @@ int main(int argc, char** argv)
   
   Magick::InitializeMagick(nullptr);
   av_register_all();
+
+  if (argc != 2)
+  {
+    std::cout << "usage: sap [configfile]" << std::endl;
+    return -1;
+  }
   
-  YAML::Node config = YAML::LoadFile("config.yml");
+  std::string configfile(argv[1]);
+  YAML::Node config = YAML::LoadFile(configfile);
   
   twitter::auth auth;
   auth.setConsumerKey(config["consumer_key"].as<std::string>());
@@ -284,44 +271,56 @@ int main(int argc, char** argv)
   
   twitter::client client(auth);
   
-  std::ifstream infile("corpus1.txt");
-  std::string corpus;
-  std::string line;
-  while (getline(infile, line))
+  // Fonts
+  std::vector<std::string> fonts;
   {
-    if (line.back() == '\r')
+    std::string fontdirname = config["fonts"].as<std::string>();
+    DIR* fontdir;
+    struct dirent* ent;
+    if ((fontdir = opendir(fontdirname.c_str())) == nullptr)
     {
-      line.pop_back();
+      std::cout << "Couldn't find fonts." << std::endl;
+      return -2;
     }
-    
-    corpus += line + " ";
-  }
-  
-  infile.close();
-  
-  std::ifstream infile2("corpus2.txt");
-  std::string corpus2;
-  while (getline(infile2, line))
-  {
-    if (line.back() == '\r')
+
+    while ((ent = readdir(fontdir)) != nullptr)
     {
-      line.pop_back();
+      std::string dname(ent->d_name);
+      if ((dname.find(".otf") != std::string::npos) || (dname.find(".ttf") != std::string::npos))
+      {
+        fonts.push_back(fontdirname + "/" + dname);
+      }
     }
-    
-    corpus2 += line + " ";
+
+    closedir(fontdir);
   }
-  
-  infile2.close();
-  
+
   rawr kgramstats;
-  kgramstats.addCorpus(corpus);
-  kgramstats.addCorpus(corpus2);
+  for (const YAML::Node& corpusname : config["corpuses"])
+  {
+    std::ifstream infile(corpusname.as<std::string>());
+    std::string corpus;
+    std::string line;
+    while (getline(infile, line))
+    {
+      if (line.back() == '\r')
+      {
+        line.pop_back();
+      }
+      
+      corpus += line + " ";
+    }
+    
+    kgramstats.addCorpus(corpus);
+  }
+
   kgramstats.compile(5);
-  kgramstats.setMinCorpora(2);
+  kgramstats.setMinCorpora(config["corpuses"].size());
   
+  std::string videodirname = config["videos"].as<std::string>();
   DIR* videodir;
   struct dirent* ent;
-  if ((videodir = opendir("videos")) == nullptr)
+  if ((videodir = opendir(videodirname.c_str())) == nullptr)
   {
     std::cout << "Couldn't find videos." << std::endl;
     return -1;
@@ -341,7 +340,7 @@ int main(int argc, char** argv)
   
   for (;;)
   {
-    std::string video = "videos/" + videos[rand() % videos.size()];
+    std::string video = videodirname + "/" + videos[rand() % videos.size()];
     std::cout << "Opening " << video << std::endl;
   
     AVFormatContext* format = nullptr;
@@ -436,7 +435,7 @@ int main(int argc, char** argv)
         std::string action = kgramstats.randomSentence(rand() % 15 + 5);
         Magick::Image textimage(Magick::Geometry(width, height), "transparent");
         Magick::Image shadowimage(Magick::Geometry(width, height), "transparent");
-        layoutText(textimage, shadowimage, width, height, action);
+        layoutText(textimage, shadowimage, width, height, action, fonts);
         image.composite(shadowimage, 0, 0, Magick::OverCompositeOp);
         image.composite(textimage, 0, 0, Magick::OverCompositeOp);
       
