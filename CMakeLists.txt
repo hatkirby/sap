@@ -10,11 +10,13 @@ pkg_check_modules(yaml-cpp yaml-cpp REQUIRED)
 pkg_check_modules(GraphicsMagick GraphicsMagick++ REQUIRED)
 
 add_subdirectory(vendor/rawr-ebooks EXCLUDE_FROM_ALL)
+add_subdirectory(vendor/mastodonpp)
 
 include_directories(
   ${FFMPEG_INCLUDE_DIRS}
   vendor/rawr-ebooks
-  vendor/rawr-ebooks/vendor/libtwittercpp/src
+  vendor/mastodonpp/include
+  vendor/json
   ${yaml-cpp_INCLUDE_DIRS}
   ${GraphicsMagick_INCLUDE_DIRS})
 
@@ -23,12 +25,12 @@ link_directories(
   ${GraphicsMagick_LIBRARY_DIRS})
 
 add_executable(sap sap.cpp director.cpp designer.cpp main.cpp)
-set_property(TARGET sap PROPERTY CXX_STANDARD 11)
+set_property(TARGET sap PROPERTY CXX_STANDARD 17)
 set_property(TARGET sap PROPERTY CXX_STANDARD_REQUIRED ON)
 
 target_link_libraries(sap
   rawr
-  twitter++
+  mastodonpp
   ${FFMPEG_LIBRARIES}
   ${GraphicsMagick_LIBRARIES}
   ${yaml-cpp_LIBRARIES})

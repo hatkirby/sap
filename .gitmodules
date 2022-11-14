@@ -1,3 +1,6 @@
 [submodule "vendor/rawr-ebooks"]
 	path = vendor/rawr-ebooks
 	url = https://github.com/hatkirby/rawr-ebooks
+[submodule "vendor/mastodonpp"]
+	path = vendor/mastodonpp
+	url = https://schlomp.space/tastytea/mastodonpp.git

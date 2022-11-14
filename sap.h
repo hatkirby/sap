@@ -5,7 +5,7 @@
 #include <string>
 #include <memory>
 #include <Magick++.h>
-#include <twitter.h>
+#include <mastodonpp.hpp>
 #include <rawr.h>
 #include "designer.h"
 #include "director.h"
@@ -21,13 +21,15 @@ public:
 
 private:
 
-  void sendTweet(Magick::Image image) const;
+  void sendTweet(Magick::Image image, const std::string& text) const;
 
   std::mt19937& rng_;
-  std::unique_ptr<twitter::client> client_;
+  std::unique_ptr<mastodonpp::Instance> instance_;
+  std::unique_ptr<mastodonpp::Connection> connection_;
   rawr kgramstats_;
   std::unique_ptr<designer> layout_;
   std::unique_ptr<director> director_;
+  std::string tempfile_;
 
 };
 

@@ -4,6 +4,7 @@
 #include <chrono>
 #include <fstream>
 #include <iostream>
+#include <json.hpp>
 
 /* - random frames from Spongebob (using ffmpeg)
  * with strange text overlaid, possibly rawr'd from
@@ -19,15 +20,13 @@ sap::sap(
 {
   // Load the config file.
   YAML::Node config = YAML::LoadFile(configFile);
+  tempfile_ = config["tempfile"].as<std::string>();
 
-  // Set up the Twitter client.
-  twitter::auth auth;
-  auth.setConsumerKey(config["consumer_key"].as<std::string>());
-  auth.setConsumerSecret(config["consumer_secret"].as<std::string>());
-  auth.setAccessKey(config["access_key"].as<std::string>());
-  auth.setAccessSecret(config["access_secret"].as<std::string>());
-
-  client_ = std::unique_ptr<twitter::client>(new twitter::client(auth));
+  // Set up the Mastodon client.
+  instance_ = std::make_unique<mastodonpp::Instance>(
+    config["mastodon_instance"].as<std::string>(),
+    config["mastodon_token"].as<std::string>());
+  connection_ = std::make_unique<mastodonpp::Connection>(*instance_);
 
   // Set up the text generator.
   for (const YAML::Node& corpusname : config["corpuses"])
@@ -64,7 +63,7 @@ void sap::run() const
 {
   for (;;)
   {
-    std::cout << "Generating tweet..." << std::endl;
+    std::cout << "Generating post..." << std::endl;
 
     try
     {
@@ -83,7 +82,7 @@ void sap::run() const
       // Send the tweet.
       std::cout << "Sending tweet..." << std::endl;
 
-      sendTweet(std::move(image));
+      sendTweet(std::move(image), action);
 
       std::cout << "Tweeted!" << std::endl;
 
@@ -92,25 +91,48 @@ void sap::run() const
     } catch (const Magick::ErrorImage& ex)
     {
       std::cout << "Image error: " << ex.what() << std::endl;
-    } catch (const twitter::twitter_error& ex)
-    {
-      std::cout << "Twitter error: " << ex.what() << std::endl;
-
-      std::this_thread::sleep_for(std::chrono::hours(1));
     }
 
     std::cout << std::endl;
   }
 }
 
-void sap::sendTweet(Magick::Image image) const
+void sap::sendTweet(Magick::Image image, const std::string& text) const
 {
-  Magick::Blob outputimg;
   image.magick("jpeg");
-  image.write(&outputimg);
+  image.write(tempfile_);
 
-  long media_id = client_->uploadMedia("image/jpeg",
-    static_cast<const char*>(outputimg.data()), outputimg.length());
+  auto answer{connection_->post(mastodonpp::API::v1::media,
+    {{"file", std::string("@file:") + tempfile_}, {"description", text}})};
+  if (!answer)
+  {
+    if (answer.curl_error_code == 0)
+    {
+      std::cout << "HTTP status: " << answer.http_status << std::endl;
+    }
+    else
+    {
+      std::cout << "libcurl error " << std::to_string(answer.curl_error_code)
+           << ": " << answer.error_message << std::endl;
+    }
+    return;
+  }
 
-  client_->updateStatus("", {media_id});
+  nlohmann::json response_json = nlohmann::json::parse(answer.body);
+  answer = connection_->post(mastodonpp::API::v1::statuses,
+    {{"status", ""}, {"media_ids",
+      std::vector<std::string_view>{response_json["id"].get<std::string>()}}});
+
+  if (!answer)
+  {
+    if (answer.curl_error_code == 0)
+    {
+      std::cout << "HTTP status: " << answer.http_status << std::endl;
+    }
+    else
+    {
+      std::cout << "libcurl error " << std::to_string(answer.curl_error_code)
+           << ": " << answer.error_message << std::endl;
+    }
+  }
 }
