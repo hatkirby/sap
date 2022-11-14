@@ -87,7 +87,7 @@ void sap::run() const
       std::cout << "Tweeted!" << std::endl;
 
       // Wait.
-      std::this_thread::sleep_for(std::chrono::hours(1));
+      std::this_thread::sleep_for(std::chrono::hours(12));
     } catch (const Magick::ErrorImage& ex)
     {
       std::cout << "Image error: " << ex.what() << std::endl;
